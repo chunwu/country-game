@@ -1,6 +1,15 @@
 import speech_recognition as sr
 import pycountry
 
+from playsound import playsound
+import os
+
+def play_tone_accepted():
+    os.system("afplay accepted.mp3")  # or .wav
+
+def play_tone_said():
+    os.system("afplay said.mp3")
+
 used_countries = set()
 warnings = {"Player 1": 0, "Player 2": 0}
 recognizer = sr.Recognizer()
@@ -55,6 +64,7 @@ def check_country(player, country):
     if country_clean in used_countries:
         warnings[player] += 1
         print(f"⚠️ Warning {warnings[player]} for {player}! '{country_clean.title()}' was already said before.")
+        play_tone_said()
         if warnings[player] >= 3:
             print(f"❌ {player} has reached 3 warnings and lost the game. Game over.")
             return False  # Player lost
@@ -64,6 +74,10 @@ def check_country(player, country):
 
     used_countries.add(country_clean)
     print(f"✅ {player} accepted: {country_clean.title()}")
+
+    # tone_path = os.path.join(os.path.dirname(__file__), "accepted.mp3")
+    play_tone_accepted()
+
     return True
 
 def start_game():
