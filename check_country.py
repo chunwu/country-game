@@ -5,10 +5,13 @@ from playsound import playsound
 import os
 
 def play_tone_accepted():
-    os.system("afplay accepted.mp3")  # or .wav
+    os.system("afplay sms.mp3")  # or .wav
 
 def play_tone_said():
-    os.system("afplay said.mp3")
+    os.system("afplay mail.mp3")
+
+def play_tone_not_recognized():
+    os.system("afplay car-lock.mp3")
 
 used_countries = set()
 warnings = {"Player 1": 0, "Player 2": 0}
@@ -33,52 +36,71 @@ for alt, official in alternative_names.items():
 
 def listen_for_country(player):
     with mic as source:
-        print(f"🎤 {player}, say a country:")
-        recognizer.adjust_for_ambient_noise(source)
+        print(f"\n🎤 {player}, say a country (you can speak naturally)...")
+        recognizer.adjust_for_ambient_noise(source, duration=1)
         try:
-            audio = recognizer.listen(source, timeout=10, phrase_time_limit=10)
+            # Increase time to start speaking and allow longer phrases
+            audio = recognizer.listen(source, timeout=30, phrase_time_limit=20)
         except sr.WaitTimeoutError:
             print("⌛ You took too long to start speaking. Please try again.")
             return None
+
     try:
-        country = recognizer.recognize_google(audio)
-        print(f"🗣️ {player} said: {country}")
-        return country
+        country_phrase = recognizer.recognize_google(audio)
+        print(f"🗣️ {player} said: {country_phrase}")
+        return country_phrase
     except sr.UnknownValueError:
-        print("❌ Could not understand. Try again.")
+        print("🤷 Could not fully understand. If you said a country, try again a bit more clearly.")
         return None
     except sr.RequestError:
-        print("🔌 Could not request results; check your internet connection.")
+        print("🔌 Speech service unavailable. Check your internet connection.")
         return None
 
-def check_country(player, country):
-    country_clean = country.strip().lower()
 
-    if country_clean in alternative_names:
-        country_clean = alternative_names[country_clean]
+import re  # Make sure this is at the top of your file
 
-    if country_clean not in valid_countries:
-        print(f"❌ '{country}' is not a recognized country. Please try again.")
-        return None  # Invalid country, ask player again
+def check_country(player, phrase):
+    phrase_lower = phrase.lower()
+    phrase_clean = re.sub(r"[^\w\s]", "", phrase_lower)  # Remove punctuation
+
+    # Try to find a valid country name in the phrase
+    country_name = None
+    for name in alternative_names:
+        pattern = r"\b" + re.escape(name) + r"\b"
+        if re.search(pattern, phrase_clean):
+            country_name = alternative_names[name]
+            break
+
+    if not country_name:
+        for name in valid_countries:
+            pattern = r"\b" + re.escape(name) + r"\b"
+            if re.search(pattern, phrase_clean):
+                country_name = name
+                break
+
+    if not country_name:
+        print(f"❌ No recognized country found in '{phrase}'. Please try again.")
+        play_tone_not_recognized()
+        return None
+
+    country_clean = country_name.lower()
 
     if country_clean in used_countries:
         warnings[player] += 1
-        print(f"⚠️ Warning {warnings[player]} for {player}! '{country_clean.title()}' was already said before.")
+        print(f"⚠️ Warning {warnings[player]} for {player}! '{country_name.title()}' was already said before.")
         play_tone_said()
         if warnings[player] >= 3:
             print(f"❌ {player} has reached 3 warnings and lost the game. Game over.")
             return False  # Player lost
         else:
-            # Warning issued, player must try again
-            return None
+            return None  # Allow retry
 
     used_countries.add(country_clean)
-    print(f"✅ {player} accepted: {country_clean.title()}")
-
-    # tone_path = os.path.join(os.path.dirname(__file__), "accepted.mp3")
+    print(f"✅ {player} accepted: {country_name.title()}")
     play_tone_accepted()
 
     return True
+
 
 def start_game():
     turn = 0
